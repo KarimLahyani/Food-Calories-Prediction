@@ -11,11 +11,12 @@ from clarifai_grpc.grpc.api.status import status_code_pb2
 
 class FoodCaloriePredictor:
     def __init__(self):
-        self.pat = 'dbc0023d90c14296801db29753d12b56'
-        self.user_id = 'clarifai'
-        self.app_id = 'main'
-        self.model_id = 'food-item-recognition'
-        self.model_version_id = '1d5fd481e0cf4826aa72ec3ff049e044'
+        # Load sensitive info from environment variables
+        self.pat = os.environ.get('CLARIFAI_PAT', '')
+        self.user_id = os.environ.get('CLARIFAI_USER_ID', 'clarifai')
+        self.app_id = os.environ.get('CLARIFAI_APP_ID', 'main')
+        self.model_id = os.environ.get('CLARIFAI_MODEL_ID', 'food-item-recognition')
+        self.model_version_id = os.environ.get('CLARIFAI_MODEL_VERSION_ID', '1d5fd481e0cf4826aa72ec3ff049e044')
         self.food_calories = {
             'apple': 95, 'banana': 105, 'orange': 62, 'grape': 62,
             'strawberry': 4, 'blueberry': 85, 'raspberry': 64,
@@ -36,10 +37,8 @@ class FoodCaloriePredictor:
             stub = service_pb2_grpc.V2Stub(channel)
             metadata = (('authorization', 'Key ' + self.pat),)
             userDataObject = resources_pb2.UserAppIDSet(user_id=self.user_id, app_id=self.app_id)
-
             with open(image_path, "rb") as f:
                 file_bytes = f.read()
-
             post_model_outputs_response = stub.PostModelOutputs(
                 service_pb2.PostModelOutputsRequest(
                     user_app_id=userDataObject,
@@ -57,11 +56,9 @@ class FoodCaloriePredictor:
                 ),
                 metadata=metadata
             )
-
             if post_model_outputs_response.status.code != status_code_pb2.SUCCESS:
                 print(post_model_outputs_response.status)
                 return None, None, None
-
             output = post_model_outputs_response.outputs[0]
             concepts = output.data.concepts
             if not concepts:
