@@ -1,73 +1,57 @@
-import requests
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
 import numpy as np
-from PIL import Image
-import os
-import base64
-from clarifai.client.model import Model
-import asyncio
-from clarifai_grpc.channel.clarifai_channel import ClarifaiChannel
-from clarifai_grpc.grpc.api import resources_pb2, service_pb2, service_pb2_grpc
-from clarifai_grpc.grpc.api.status import status_code_pb2
 
 class FoodCaloriePredictor:
     def __init__(self):
-        # Load sensitive info from environment variables
-        self.pat = os.environ.get('CLARIFAI_PAT', '')
-        self.user_id = os.environ.get('CLARIFAI_USER_ID', 'clarifai')
-        self.app_id = os.environ.get('CLARIFAI_APP_ID', 'main')
-        self.model_id = os.environ.get('CLARIFAI_MODEL_ID', 'food-item-recognition')
-        self.model_version_id = os.environ.get('CLARIFAI_MODEL_VERSION_ID', '1d5fd481e0cf4826aa72ec3ff049e044')
+        # Load trained model
+        self.model = load_model("food_calorie_predictor/food_model_transfer.keras", compile=False)
+
+        # Load class names from file
+        with open("food_calorie_predictor/class_names.txt", "r") as f:
+            self.class_names = [line.strip() for line in f.readlines()]
+
+        # Estimated calories for each class name
         self.food_calories = {
-            'apple': 95, 'banana': 105, 'orange': 62, 'grape': 62,
-            'strawberry': 4, 'blueberry': 85, 'raspberry': 64,
-            'pizza': 266, 'burger': 354, 'hotdog': 151, 'sandwich': 300,
-            'pasta': 131, 'rice': 130, 'bread': 79, 'toast': 75,
-            'egg': 78, 'chicken': 165, 'beef': 250, 'fish': 206,
-            'salad': 20, 'carrot': 25, 'broccoli': 55, 'tomato': 22,
-            'potato': 161, 'corn': 88, 'peas': 84, 'beans': 225,
-            'milk': 103, 'cheese': 113, 'yogurt': 59, 'ice_cream': 137,
-            'cake': 257, 'cookie': 78, 'chocolate': 546, 'candy': 245,
-            'coffee': 2, 'tea': 2, 'juice': 111, 'soda': 150,
-            'water': 0,
+            'apple_pie': 320, 'baby_back_ribs': 300, 'baklava': 300, 'beef_carpaccio': 300, 'beef_tartare': 180,
+            'beet_salad': 150, 'beignets': 300, 'bibimbap': 300, 'bread_pudding': 250, 'breakfast_burrito': 350,
+            'bruschetta': 300, 'caesar_salad': 150, 'cannoli': 300, 'caprese_salad': 150, 'carrot_cake': 300,
+            'ceviche': 300, 'cheesecake': 300, 'cheese_plate': 330, 'chicken_curry': 450, 'chicken_quesadilla': 300,
+            'chicken_wings': 300, 'chocolate_cake': 300, 'chocolate_mousse': 260, 'churros': 300, 'clam_chowder': 300,
+            'club_sandwich': 350, 'crab_cakes': 300, 'creme_brulee': 300, 'croque_madame': 300, 'cup_cakes': 300,
+            'deviled_eggs': 160, 'donuts': 280, 'dumplings': 300, 'edamame': 300, 'eggs_benedict': 160,
+            'escargots': 300, 'falafel': 300, 'filet_mignon': 300, 'fish_and_chips': 300, 'foie_gras': 300,
+            'french_fries': 365, 'french_onion_soup': 250, 'french_toast': 150, 'fried_calamari': 300,
+            'fried_rice': 250, 'frozen_yogurt': 300, 'garlic_bread': 250, 'gnocchi': 300, 'greek_salad': 150,
+            'grilled_cheese_sandwich': 350, 'grilled_salmon': 300, 'guacamole': 300, 'gyoza': 300, 'hamburger': 500,
+            'hot_and_sour_soup': 250, 'hot_dog': 300, 'huevos_rancheros': 300, 'hummus': 300, 'ice_cream': 200,
+            'lasagna': 300, 'lobster_bisque': 300, 'lobster_roll_sandwich': 350, 'macaroni_and_cheese': 330,
+            'macarons': 300, 'miso_soup': 250, 'mussels': 300, 'nachos': 300, 'omelette': 300, 'onion_rings': 300,
+            'oysters': 300, 'pad_thai': 300, 'paella': 300, 'pancakes': 300, 'panna_cotta': 300, 'peking_duck': 400,
+            'pho': 300, 'pizza': 300, 'pork_chop': 300, 'poutine': 300, 'prime_rib': 300, 'pulled_pork_sandwich': 350,
+            'ramen': 300, 'ravioli': 300, 'red_velvet_cake': 300, 'risotto': 300, 'samosa': 300, 'sashimi': 300,
+            'scallops': 300, 'seaweed_salad': 150, 'shrimp_and_grits': 320, 'spaghetti_bolognese': 300,
+            'spaghetti_carbonara': 420, 'spring_rolls': 350, 'steak': 450, 'strawberry_shortcake': 300,
+            'sushi': 300, 'tacos': 300, 'takoyaki': 300, 'tiramisu': 300, 'tuna_tartare': 180, 'waffles': 300
         }
 
     def predict_food(self, image_path):
         try:
-            channel = ClarifaiChannel.get_grpc_channel()
-            stub = service_pb2_grpc.V2Stub(channel)
-            metadata = (('authorization', 'Key ' + self.pat),)
-            userDataObject = resources_pb2.UserAppIDSet(user_id=self.user_id, app_id=self.app_id)
-            with open(image_path, "rb") as f:
-                file_bytes = f.read()
-            post_model_outputs_response = stub.PostModelOutputs(
-                service_pb2.PostModelOutputsRequest(
-                    user_app_id=userDataObject,
-                    model_id=self.model_id,
-                    version_id=self.model_version_id,
-                    inputs=[
-                        resources_pb2.Input(
-                            data=resources_pb2.Data(
-                                image=resources_pb2.Image(
-                                    base64=file_bytes
-                                )
-                            )
-                        )
-                    ]
-                ),
-                metadata=metadata
-            )
-            if post_model_outputs_response.status.code != status_code_pb2.SUCCESS:
-                print(post_model_outputs_response.status)
-                return None, None, None
-            output = post_model_outputs_response.outputs[0]
-            concepts = output.data.concepts
-            if not concepts:
-                return None, None, None
-            top_concept = concepts[0]
-            food_type = top_concept.name.lower()
-            confidence = top_concept.value
+            # Load and preprocess image
+            img = load_img(image_path, target_size=(224, 224))
+            img_array = img_to_array(img) / 255.0
+            img_array = np.expand_dims(img_array, axis=0)
+
+            # Make prediction
+            predictions = self.model.predict(img_array)
+            food_index = np.argmax(predictions, axis=-1)[0]
+            food_type = self.class_names[food_index]
+            confidence = float(np.max(predictions))
+
+            # Calorie lookup
             calories = self.food_calories.get(food_type, None)
+
             return food_type, calories, confidence
         except Exception as e:
-            print(f"Error predicting food with Clarifai gRPC: {e}")
-            return None, None, None 
+            print(f"Error predicting food with TensorFlow: {e}")
+            return None, None, None

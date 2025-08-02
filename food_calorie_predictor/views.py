@@ -1,14 +1,9 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
-import json
 import os
 from .models import FoodImage
 from .ml_model import FoodCaloriePredictor
-from PIL import Image
-import io
 
 # Initialize the ML model
 predictor = FoodCaloriePredictor()
