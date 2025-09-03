@@ -3,7 +3,6 @@ from django.utils import timezone
 
 
 class FoodImage(models.Model):
-    """Model to store uploaded food images and their predictions."""
     image = models.ImageField(upload_to='food_images/')
     uploaded_at = models.DateTimeField(default=timezone.now)
     predicted_food = models.CharField(max_length=200, blank=True, null=True)

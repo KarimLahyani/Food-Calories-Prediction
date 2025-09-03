@@ -4,14 +4,10 @@ import numpy as np
 
 class FoodCaloriePredictor:
     def __init__(self):
-        # Load trained model
-        self.model = load_model("food_calorie_predictor/food_model_transfer.keras", compile=False)
-
-        # Load class names from file
+        self.model = load_model("food_calorie_predictor/food101_model.keras", compile=False)
         with open("food_calorie_predictor/class_names.txt", "r") as f:
             self.class_names = [line.strip() for line in f.readlines()]
-
-        # Estimated calories for each class name
+        
         self.food_calories = {
             'apple_pie': 320, 'baby_back_ribs': 300, 'baklava': 300, 'beef_carpaccio': 300, 'beef_tartare': 180,
             'beet_salad': 150, 'beignets': 300, 'bibimbap': 300, 'bread_pudding': 250, 'breakfast_burrito': 350,
@@ -37,18 +33,17 @@ class FoodCaloriePredictor:
 
     def predict_food(self, image_path):
         try:
-            # Load and preprocess image
             img = load_img(image_path, target_size=(224, 224))
             img_array = img_to_array(img) / 255.0
             img_array = np.expand_dims(img_array, axis=0)
 
-            # Make prediction
             predictions = self.model.predict(img_array)
             food_index = np.argmax(predictions, axis=-1)[0]
-            food_type = self.class_names[food_index]
             confidence = float(np.max(predictions))
+            if confidence < 0.7:
+                return None, None, None
 
-            # Calorie lookup
+            food_type = self.class_names[food_index]
             calories = self.food_calories.get(food_type, None)
 
             return food_type, calories, confidence

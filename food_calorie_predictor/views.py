@@ -17,18 +17,18 @@ def predict_calories(request):
     """API endpoint for calorie prediction."""
     if request.method == 'POST':
         try:
-            # Handle file upload
+            
             if 'image' in request.FILES:
                 image_file = request.FILES['image']
                 
-                # Save image to model
+                
                 food_image = FoodImage(image=image_file)
                 food_image.save()
                 
-                # Get prediction
+                
                 food_type, calories, confidence = predictor.predict_food(food_image.image.path)
                 
-                # Update model with predictions
+                
                 food_image.predicted_food = food_type
                 food_image.predicted_calories = calories
                 food_image.confidence_score = confidence
